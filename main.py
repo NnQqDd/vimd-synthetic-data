@@ -90,13 +90,13 @@ def main():
 
     metadata_paths = [os.path.join("dataset/metadatas", path) for path in os.listdir("dataset/metadatas")]
     metadatas = []
-    for metadata_path in metadata_paths:
+    for metadata_path in tqdm(metadata_paths):
         with open(metadata_path, "r") as f:
             lines = f.readlines()
             lines = [line.strip() for line in lines]
             lines[1] = lines[1].split("ViMD/", 1)[-1]
             lines[1] = "ViMD/" + lines[1]
-            audio_id, _ = os.path.splitext(metadata_path)
+            audio_id = os.path.basename(metadata_path).split('.')[0]
             audio_path = os.path.join("audios", f"{audio_id}.wav")
             lines.insert(0, audio_path)
             metadatas.append(lines)
