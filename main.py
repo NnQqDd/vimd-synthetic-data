@@ -28,14 +28,15 @@ def worker(rank, indices_list, texts, references_records, N, output_dir):
         row = references_records[idx]
         for jdx in range(N):
             audio_id = str(uuid.uuid4())
+            text = texts[idx * N + jdx]
             audio = model.generate(
-                text=texts[idx * N + jdx],
+                text=text,
                 ref_audio=row["filepath"],
                 # ref_text="Transcription of the reference audio.",
             )
             sf.write(os.path.join(audios_dir, f"{audio_id}.wav"), audio[0], 24000)
             with open(os.path.join(metas_dir, f"{audio_id}.txt"), "w") as f:
-                f.write(f"{texts[idx]}\n{row['filepath']}\n{row['speaker_id']}")
+                f.write(f"{text}\n{row['filepath']}\n{row['speaker_id']}")
 
 
 def parse_args():
