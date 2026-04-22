@@ -3,3 +3,4 @@ dataset/
 metadatas/
 *.wav
 *.env
+*.csv

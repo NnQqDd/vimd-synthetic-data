@@ -1,3 +1,4 @@
+import argparse
 import warnings; warnings.filterwarnings("ignore")
 
 import os
@@ -37,18 +38,32 @@ def worker(rank, indices_list, texts, references_records, N, output_dir):
                 f.write(f"{texts[idx]}\n{row['filepath']}\n{row['speaker_id']}")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--R", type=int, default=1000, help="Value of R")
+    parser.add_argument("--P", type=int, default=0, help="Value of P")
+    parser.add_argument("--N", type=int, default=100, help="Value of N")
+
+    args = parser.parse_args()
+
+    return args
+
+
 def main():
+    args = parse_args()
+    R = args.R
+    P = args.P
+    N = args.N
+
+    print(R, P, N)
+
     df_texts = pd.read_csv("metadatas/PhoMT_training.csv")["vi"]
     print(df_texts.nunique())
     texts = df_texts.tolist()
 
     df_references = pd.read_csv("metadatas/single_speakers.csv")
     print(df_references.nunique())
-
-    R = 1000
-    P = 0
-    N = 100
-    print(R, P, N)
 
     os.makedirs("dataset/audios", exist_ok=True)
     os.makedirs("dataset/metadatas", exist_ok=True)
@@ -72,6 +87,21 @@ def main():
         nprocs=num_gpus,
         join=True,
     )
+
+    metadata_paths = [os.path.join("dataset/metadatas", path) for path in os.listdir("dataset/metadatas")]
+    metadatas = []
+    for metadata_path in metadata_paths:
+        with open(metadata_path, "r") as f:
+            lines = f.readlines()
+            lines = [line.strip() for line in lines]
+            lines[1] = lines[1].split("ViMD/", 1)[-1]
+            lines[1] = "ViMD/" + lines[1]
+            audio_id, _ = os.path.splitext(metadata_path)
+            audio_path = os.path.join("audios", f"{audio_id}.wav")
+            lines.insert(0, audio_path)
+            metadatas.append(lines)
+    metadata_df = pd.DataFrame(metadatas, columns=['filepath', 'text', 'reference', 'speaker_id'])
+    metadata_df.to_csv("dataset/metadata.csv", index=False)
 
 
 if __name__ == "__main__":
