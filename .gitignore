@@ -4,3 +4,4 @@ metadatas/
 *.wav
 *.env
 *.csv
+temp.py

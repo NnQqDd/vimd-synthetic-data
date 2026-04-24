@@ -32,7 +32,7 @@ def worker(rank, indices_list, texts, references_records, N, output_dir):
             audio = model.generate(
                 text=text,
                 ref_audio=row["filepath"],
-                # ref_text="Transcription of the reference audio.",
+                ref_text=row['text'],
             )
             sf.write(os.path.join(audios_dir, f"{audio_id}.wav"), audio[0], 24000)
             with open(os.path.join(metas_dir, f"{audio_id}.txt"), "w") as f:
