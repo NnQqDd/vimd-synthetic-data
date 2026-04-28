@@ -69,7 +69,7 @@ def parse_args():
     parser.add_argument("-R", type=int, default=1000, help="Value of R")
     parser.add_argument("-P", type=int, default=0, help="Value of P")
     parser.add_argument("-N", type=int, default=100, help="Value of N")
-    parser.add_argument("-u", type=str, default="dataset", help="Upload Dataset on Minio or not")
+    parser.add_argument("-u", type=str, help="Upload Dataset on Minio or not")
     parser.add_argument("-d", action="store_true", help="Delete local files after uploading to Minio")
     args = parser.parse_args()
 
