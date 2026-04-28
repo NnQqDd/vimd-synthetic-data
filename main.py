@@ -1,6 +1,6 @@
-import argparse
 import warnings; warnings.filterwarnings("ignore")
-
+import argparse
+import dotenv; dotenv.load_dotenv()
 import os
 import uuid
 import pandas as pd
@@ -8,10 +8,11 @@ import soundfile as sf
 import torch
 import torch.multiprocessing as mp
 from tqdm import tqdm
+from minio import Minio
 from omnivoice import OmniVoice
 
 
-def worker(rank, indices_list, texts, references_records, N, output_dir):
+def worker(rank, indices_list, texts, references_records, N, output_dir, upload_dir=None, delete_local=False):
     # rank is automatically passed by mp.spawn as the process index → use it as GPU id
     device = f"cuda:{rank}"
     model = OmniVoice.from_pretrained(
@@ -24,6 +25,13 @@ def worker(rank, indices_list, texts, references_records, N, output_dir):
     metas_dir = os.path.join(output_dir, "metadatas")
 
     my_indices = indices_list[rank]
+
+    client = Minio(
+        "lake-api.actable.ai:9000",
+        access_key=os.getenv("MINIO_ACCESS_KEY"),
+        secret_key=os.getenv("MINIO_SECRET_KEY"),
+        secure=False
+    )
     for idx in tqdm(my_indices, desc=f"GPU{rank}", position=rank):
         row = references_records[idx]
         for jdx in range(N):
@@ -34,18 +42,35 @@ def worker(rank, indices_list, texts, references_records, N, output_dir):
                 ref_audio=row["filepath"],
                 ref_text=row['text'],
             )
-            sf.write(os.path.join(audios_dir, f"{audio_id}.wav"), audio[0], 24000)
-            with open(os.path.join(metas_dir, f"{audio_id}.txt"), "w") as f:
+            audio_path = os.path.join(audios_dir, f"{audio_id}.wav")
+            metadata_path = os.path.join(metas_dir, f"{audio_id}.txt")
+            sf.write(audio_path, audio[0], 24000)
+            with open(metadata_path, "w") as f:
                 f.write(f"{text}\n{row['filepath']}\n{row['speaker_id']}")
+
+            if upload_dir is not None:
+                bucket = upload_dir.split('/')[0]
+                path = '/'.join(upload_dir.split('/')[1:])
+                audio_upload = os.path.join(path, f"audios/{audio_id}.wav")
+                metadata_upload = os.path.join(path, f"metadatas/{audio_id}.txt")
+                try:
+                    client.fput_object(bucket, audio_upload, audio_path)
+                    client.fput_object(bucket, metadata_upload, metadata_path)
+                except Exception as e:
+                    print(f"Error occurred while uploading {audio_id}: {e}")
+                if delete_local:    
+                    os.remove(audio_path)
+                    os.remove(metadata_path)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--R", type=int, default=1000, help="Value of R")
-    parser.add_argument("--P", type=int, default=0, help="Value of P")
-    parser.add_argument("--N", type=int, default=100, help="Value of N")
-
+    parser.add_argument("-R", type=int, default=1000, help="Value of R")
+    parser.add_argument("-P", type=int, default=0, help="Value of P")
+    parser.add_argument("-N", type=int, default=100, help="Value of N")
+    parser.add_argument("-u", type=str, default="dataset", help="Upload Dataset on Minio or not")
+    parser.add_argument("-d", action="store_true", help="Delete local files after uploading to Minio")
     args = parser.parse_args()
 
     return args
@@ -84,7 +109,7 @@ def main():
 
     mp.spawn(
         worker,
-        args=(indices_list, texts, references_records, N, "dataset"),
+        args=(indices_list, texts, references_records, N, "dataset", args.u, args.d),
         nprocs=num_gpus,
         join=True,
     )
