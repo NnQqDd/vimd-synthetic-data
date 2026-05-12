@@ -27,7 +27,7 @@ def worker(rank, indices_list, texts, references_records, N, output_dir, upload_
     my_indices = indices_list[rank]
 
     client = Minio(
-        "lake-api.actable.ai:9000",
+        os.getenv("MINIO_URL"),
         access_key=os.getenv("MINIO_ACCESS_KEY"),
         secret_key=os.getenv("MINIO_SECRET_KEY"),
         secure=False
